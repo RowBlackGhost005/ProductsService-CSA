@@ -1,6 +1,11 @@
 package com.marin.ProductsService.service;
 
+import com.marin.ProductsService.dto.OrderResultDTO;
+import com.marin.ProductsService.dto.ProductDTO;
+import com.marin.ProductsService.dto.StockProductDTO;
 import com.marin.ProductsService.entities.Product;
+import com.marin.ProductsService.exception.InsufficientStockException;
+import com.marin.ProductsService.exception.InvalidStockException;
 
 import java.util.List;
 
@@ -16,7 +21,9 @@ public interface ProductService {
 
     void deleteProduct(int id);
 
-    boolean unstockProduct(int id , int stock);
+    ProductDTO unstockProduct(StockProductDTO productStock);
 
-    boolean stockProduct(int id , int stock);
+    ProductDTO stockProduct(StockProductDTO productStock) throws InvalidStockException;
+
+    OrderResultDTO orderProducts(List<ProductDTO> products) throws InsufficientStockException;
 }

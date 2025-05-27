@@ -1,10 +1,18 @@
 package com.marin.ProductsService.service;
 
+import com.marin.ProductsService.dto.OrderResultDTO;
+import com.marin.ProductsService.dto.ProductDTO;
+import com.marin.ProductsService.dto.ProductDetailsDTO;
+import com.marin.ProductsService.dto.StockProductDTO;
 import com.marin.ProductsService.entities.Product;
+import com.marin.ProductsService.exception.InsufficientStockException;
+import com.marin.ProductsService.exception.InvalidStockException;
 import com.marin.ProductsService.repository.ProductRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -61,38 +69,60 @@ public class ProductServiceImp implements ProductService {
     }
 
     @Override
-    public boolean unstockProduct(int id, int stock) {
+    public ProductDTO unstockProduct(StockProductDTO productStock) {
 
-        if(stock <= 0){
+        if(productStock.stock() <= 0){
             //throw new InvalidParameterException("Invalid stock quantity to remove");
         }
 
-        Product productDB = productRepository.findById(id).orElseThrow();
+        Product productDB = productRepository.findById(productStock.productId()).orElseThrow();
 
-        if(stock > productDB.getStock()){
+        if(productStock.stock() > productDB.getStock()){
             //throw new InsufficientStockException("Insufficient stock");
         }
 
-        productDB.setStock(productDB.getStock() - stock);
+        productDB.setStock(productDB.getStock() - productStock.stock());
 
-        productRepository.save(productDB);
+        productDB = productRepository.save(productDB);
 
-        return true;
+        return new ProductDTO(productDB.getId() , productDB.getStock());
     }
 
     @Override
-    public boolean stockProduct(int id, int stock) {
+    public ProductDTO stockProduct(StockProductDTO productStock) throws InvalidStockException {
 
-        if(stock <= 0){
-            //throw new InvalidParameterException("Invalid stock quantity to remove");
+        if(productStock.stock() <= 0){
+            throw new InvalidStockException("Invalid stock quantity to remove");
         }
 
-        Product productDB = productRepository.findById(id).orElseThrow();
+        Product productDB = productRepository.findById(productStock.productId()).orElseThrow();
 
-        productDB.setStock(productDB.getStock() + stock);
+        productDB.setStock(productDB.getStock() + productStock.stock());
 
-        productRepository.save(productDB);
+        productDB = productRepository.save(productDB);
 
-        return true;
+        return new ProductDTO(productDB.getId() , productDB.getStock());
+    }
+
+    @Override
+    @Transactional
+    public OrderResultDTO orderProducts(List<ProductDTO> products) throws InsufficientStockException {
+        float total = 0;
+        List<ProductDetailsDTO> productDetailsDTOs = new ArrayList<>(products.size());
+
+        for(ProductDTO productDTO : products){
+            Product product = productRepository.findById(productDTO.productId()).orElseThrow();
+
+            if(product.getStock() >= productDTO.quantity()){
+                product.setStock(product.getStock() - productDTO.quantity());
+                productRepository.save(product);
+
+                total += productDTO.quantity() * product.getPrice();
+                productDetailsDTOs.add(new ProductDetailsDTO(product.getId() , product.getName() , product.getDescription() , product.getPrice()));
+            }else{
+                throw new InsufficientStockException("Not enough stock for product " + product.getId());
+            }
+        }
+        return new OrderResultDTO(total , productDetailsDTOs);
     }
 }
